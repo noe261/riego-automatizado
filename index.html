@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datos de Riego</title>
+    <style>
+        /* Fondo con video estático */
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            color: white;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Evita el scroll por la lluvia */
+            position: relative;
+            height: 100vh; /* Asegura que la página tenga al menos el tamaño de la ventana */
+        }
+
+        h1 {
+            color: #ffffff;
+            text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.7);
+        }
+
+        /* Contenedor de datos */
+        #data {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            display: inline-block;
+            text-align: left;
+            color: black;
+        }
+
+        p {
+            font-size: 18px;
+        }
+
+        .error {
+            color: red;
+        }
+
+        /* Video de lluvia */
+        #rainVideo {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Hace que el video cubra toda la pantalla */
+            z-index: -1; /* Colocamos el video detrás del contenido */
+            opacity: 0;
+            transition: opacity 1s ease-in-out; /* Efecto de transición entre videos */
+        }
+
+        /* Video de fondo inicial (sin lluvia) */
+        #backgroundVideo {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+            opacity: 1;
+            transition: opacity 1s ease-in-out;
+        }
+
+        /* Texto de estado del riego */
+        #statusText {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+            font-weight: bold;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+        }
+
+        /* Texto de concienciación ambiental */
+        #waterCareText {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-size: 16px;
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            text-align: right;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px;
+            border-radius: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+        }
+
+    </style>
+</head>
+<body>
+    <h1>Datos de Riego</h1>
+
+    <div id="data">
+        <p><strong>Fecha:</strong> <span id="fecha">-</span></p>
+        <p><strong>Hora:</strong> <span id="hora">-</span></p>
+        <p><strong>Humedad 1:</strong> <span id="humedad1">-</span>%</p>
+        <p><strong>Humedad 2:</strong> <span id="humedad2">-</span>%</p>
+        <p><strong>Activaciones de Riego:</strong> <span id="activaciones">-</span></p>
+    </div>
+
+    <!-- Estado del riego -->
+    <div id="statusText">Riego terminado y en espera</div>
+
+    <!-- Frase de concienciación ambiental -->
+    <div id="waterCareText">UN MUNDO SIN AGUA ES UN MUNDO SIN VIDA, CUIDALA</div>
+
+    <!-- Video de fondo inicial (sin lluvia) -->
+    <video id="backgroundVideo" autoplay loop muted>
+    <source src="https://github.com/noe261
+/riego-automatizado/videoinicial.mp4" type="video/mp4">
+</video>
+
+<video id="rainVideo" autoplay loop muted>
+    <source src="https://github.com/noe261
+/riego-automatizado/videoriego2.mp4" type="video/mp4">
+</video>
+
+
+    <script>
+        // Conectar con WebSocket
+        const socket = new WebSocket('ws://192.168.0.133:8080');
+
+        socket.onopen = () => {
+            console.log('✅ Conectado al servidor WebSocket');
+        };
+
+        socket.onmessage = (event) => {
+            try {
+                console.log("Mensaje recibido:", event.data);
+                const data = JSON.parse(event.data);
+                if (data && data.fecha && data.hora) {
+                    document.getElementById('fecha').textContent = data.fecha || "-";
+                    document.getElementById('hora').textContent = data.hora || "-";
+                    document.getElementById('humedad1').textContent = parseFloat(data.humedad1).toFixed(1) || "-";
+                    document.getElementById('humedad2').textContent = parseFloat(data.humedad2).toFixed(1) || "-";
+                    document.getElementById('activaciones').textContent = data.activacionesRiego || "-";
+
+                    // Verificar las humedades para activar/desactivar lluvia
+                    const humedad1 = parseFloat(data.humedad1);
+                    const humedad2 = parseFloat(data.humedad2);
+
+                    if (humedad1 >= 100 && humedad2 >= 100) {
+                        document.getElementById('rainVideo').style.opacity = '0';
+                        document.getElementById('backgroundVideo').style.opacity = '1';
+                        document.getElementById('statusText').textContent = "Riego terminado y en espera";
+                        console.log("❌ Lluvia desactivada, ambas humedades están al 100%");
+                    } else if (humedad1 < 20 || humedad2 < 20) {
+                        document.getElementById('rainVideo').style.opacity = '1';
+                        document.getElementById('backgroundVideo').style.opacity = '0';
+                        document.getElementById('statusText').textContent = "Riego en curso...";
+                        console.log("✅ Lluvia activada");
+                    } else {
+                        document.getElementById('rainVideo').style.opacity = '0';
+                        document.getElementById('backgroundVideo').style.opacity = '1';
+                        document.getElementById('statusText').textContent = "Riego terminado y en espera";
+                        console.log("✅ Lluvia desactivada, humedades entre 20% y 100%");
+                    }
+                } else {
+                    console.error("❌ Datos incorrectos recibidos");
+                }
+            } catch (error) {
+                console.error("❌ Error al procesar los datos recibidos:", error);
+            }
+        };
+
+        socket.onerror = (error) => {
+            console.error("⚠️ Error en la conexión WebSocket:", error);
+        };
+
+        socket.onclose = () => {
+            console.log('❌ Desconectado del servidor WebSocket');
+        };
+    </script>
+</body>
+</html>
